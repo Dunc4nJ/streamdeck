@@ -135,8 +135,268 @@ unzip -p vibecoding_profile.streamDeckProfile "AFBA0E43-48AA-48AC-958A-81E928D63
 |---|---|---|
 | `com.elgato.streamdeck.system.text` | Text | Pastes text into the focused application |
 | `com.elgato.streamdeck.system.hotkey` | Hotkey | Sends a keyboard shortcut |
+| `com.elgato.streamdeck.page.next` | Next Page | Navigate to the next page |
+| `com.elgato.streamdeck.page.previous` | Previous Page | Navigate to the previous page |
+| `com.elgato.streamdeck.page.pop` | Go to Page | Jump to a specific page |
+| `com.elgato.streamdeck.profile.folder` | Create Folder | Opens a nested group of buttons |
 
 Most buttons in this profile are **Text** actions that paste prompts into a terminal running Claude Code or similar AI coding tools.
+
+### Text Button
+
+Pastes text into the focused application when pressed. The workhorse of this profile.
+
+```json
+{
+  "ActionID": "864aa3cc-a354-46cd-9a88-9125442795ce",
+  "LinkedTitle": true,
+  "Name": "Text",
+  "Plugin": {
+    "Name": "Text",
+    "UUID": "com.elgato.streamdeck.system.text",
+    "Version": "1.0"
+  },
+  "Settings": {
+    "Hotkey": {
+      "KeyModifiers": 0,
+      "QTKeyCode": 33554431,
+      "VKeyCode": -1
+    },
+    "isSendingEnter": false,
+    "isTypingMode": false,
+    "pastedText": "YOUR PROMPT TEXT HERE"
+  },
+  "State": 0,
+  "States": [
+    {
+      "FontFamily": "Verdana",
+      "FontSize": 10,
+      "FontStyle": "Regular",
+      "FontUnderline": false,
+      "Image": "Images/YOUR_IMAGE_ID.png",
+      "OutlineThickness": 2,
+      "ShowTitle": true,
+      "Title": "Button Label",
+      "TitleAlignment": "top",
+      "TitleColor": "#ffffff"
+    }
+  ],
+  "UUID": "com.elgato.streamdeck.system.text"
+}
+```
+
+Key fields:
+- `Settings.pastedText` — the text that gets pasted
+- `Settings.isSendingEnter` — set `true` to press Enter after pasting (auto-submit)
+- `Settings.isTypingMode` — `true` types character-by-character (slower, more compatible); `false` pastes from clipboard (faster)
+- `States[0].Image` — path to the button icon PNG (omit for no icon)
+- `States[0].Title` — text label shown on the button
+- `States[0].ShowTitle` — `false` to hide the label and show only the icon
+
+### Hotkey Button
+
+Sends a keyboard shortcut. The `Hotkeys` array supports up to 4 simultaneous key combos.
+
+```json
+{
+  "ActionID": "8a2ee19c-77f1-4128-bf9b-050be956f866",
+  "LinkedTitle": true,
+  "Name": "Hotkey",
+  "Plugin": {
+    "Name": "Activate a Key Command",
+    "UUID": "com.elgato.streamdeck.system.hotkey",
+    "Version": "1.0"
+  },
+  "Settings": {
+    "Coalesce": true,
+    "Hotkeys": [
+      {
+        "KeyCmd": false,
+        "KeyCtrl": true,
+        "KeyModifiers": 3,
+        "KeyOption": false,
+        "KeyShift": true,
+        "NativeCode": 53,
+        "QTKeyCode": 53,
+        "VKeyCode": 53
+      }
+    ]
+  },
+  "State": 0,
+  "States": [
+    {
+      "FontFamily": "",
+      "FontSize": 9,
+      "FontStyle": "",
+      "FontUnderline": false,
+      "OutlineThickness": 2,
+      "ShowTitle": true,
+      "Title": "New Term",
+      "TitleAlignment": "top",
+      "TitleColor": "#ffffff"
+    }
+  ],
+  "UUID": "com.elgato.streamdeck.system.hotkey"
+}
+```
+
+Key fields:
+- `Settings.Hotkeys[]` — array of key combos (unused slots have `VKeyCode: -1`)
+- `KeyCmd` / `KeyCtrl` / `KeyShift` / `KeyOption` — modifier keys (boolean)
+- `KeyModifiers` — bitmask: 1=Shift, 2=Ctrl, 4=Option, 8=Cmd (sum for combos, e.g. Ctrl+Shift = 3)
+- `NativeCode` — platform-specific key code
+- `VKeyCode` — virtual key code (`-1` means unused/empty slot)
+- `Settings.Coalesce` — `true` to send all hotkeys as one action
+
+### Next Page / Previous Page
+
+Navigation buttons for multi-page profiles. No settings required.
+
+```json
+{
+  "ActionID": "<generate-uuid-v4>",
+  "LinkedTitle": true,
+  "Name": "Next Page",
+  "Plugin": {
+    "Name": "Next Page",
+    "UUID": "com.elgato.streamdeck.page.next",
+    "Version": "1.0"
+  },
+  "Settings": {},
+  "State": 0,
+  "States": [
+    {
+      "FontFamily": "",
+      "FontSize": 12,
+      "FontStyle": "",
+      "FontUnderline": false,
+      "OutlineThickness": 2,
+      "ShowTitle": true,
+      "Title": "Next →",
+      "TitleAlignment": "middle",
+      "TitleColor": "#ffffff"
+    }
+  ],
+  "UUID": "com.elgato.streamdeck.page.next"
+}
+```
+
+For Previous Page, replace:
+- `Plugin.Name` → `"Previous Page"`
+- `Plugin.UUID` → `"com.elgato.streamdeck.page.previous"`
+- `UUID` → `"com.elgato.streamdeck.page.previous"`
+- `Title` → `"← Prev"`
+
+To add a second page, update the **top-level** `manifest.json`:
+
+```json
+{
+  "Device": { "Model": "20GAT9901", "UUID": "" },
+  "Name": "Default Profile",
+  "Pages": {
+    "Current": "<page-1-uuid>",
+    "Default": "<page-1-uuid>",
+    "Pages": [
+      "<page-1-uuid>",
+      "<page-2-uuid>"
+    ]
+  },
+  "Version": "2.0"
+}
+```
+
+Then create a new directory under `Profiles/` named `<PAGE_2_ID>/` with its own `manifest.json` and `Images/` folder, following the same structure as the existing page.
+
+### Go to Page
+
+Jumps directly to a specific page number.
+
+```json
+{
+  "ActionID": "<generate-uuid-v4>",
+  "LinkedTitle": true,
+  "Name": "Go To Page",
+  "Plugin": {
+    "Name": "Go To Page",
+    "UUID": "com.elgato.streamdeck.page.pop",
+    "Version": "1.0"
+  },
+  "Settings": {
+    "ProfileUUID": "<target-page-uuid-from-Pages-array>"
+  },
+  "State": 0,
+  "States": [
+    {
+      "FontFamily": "",
+      "FontSize": 12,
+      "FontStyle": "",
+      "FontUnderline": false,
+      "OutlineThickness": 2,
+      "ShowTitle": true,
+      "Title": "Page 2",
+      "TitleAlignment": "middle",
+      "TitleColor": "#ffffff"
+    }
+  ],
+  "UUID": "com.elgato.streamdeck.page.pop"
+}
+```
+
+Key fields:
+- `Settings.ProfileUUID` — the UUID of the target page (must match an entry in the top-level manifest's `Pages.Pages` array)
+
+### Create Folder
+
+A folder button opens a nested sub-layout. When pressed, the Stream Deck displays the folder's buttons. A back button is automatically added.
+
+Folders are implemented as a sub-profile embedded within the page manifest:
+
+```json
+{
+  "ActionID": "<generate-uuid-v4>",
+  "LinkedTitle": true,
+  "Name": "Create Folder",
+  "Plugin": {
+    "Name": "Create Folder",
+    "UUID": "com.elgato.streamdeck.profile.folder",
+    "Version": "1.0"
+  },
+  "Settings": {
+    "ProfileUUID": "<folder-sub-profile-uuid>"
+  },
+  "State": 0,
+  "States": [
+    {
+      "FontFamily": "Verdana",
+      "FontSize": 10,
+      "FontStyle": "Regular",
+      "FontUnderline": false,
+      "OutlineThickness": 2,
+      "ShowTitle": true,
+      "Title": "My Folder",
+      "TitleAlignment": "top",
+      "TitleColor": "#ffffff"
+    }
+  ],
+  "UUID": "com.elgato.streamdeck.profile.folder"
+}
+```
+
+The folder's contents are stored as a separate sub-profile directory under `Profiles/`, following the same manifest structure as a page. The `Settings.ProfileUUID` links to that sub-profile's directory name.
+
+```
+Profiles/
+  <PAGE_ID>/           # Main page
+    manifest.json
+    Images/
+  <FOLDER_ID>/         # Folder contents
+    manifest.json      # Same structure as a page manifest — has its own Actions grid
+    Images/
+```
+
+The folder's `manifest.json` uses the same `Controllers[0].Actions` structure with `"row,col"` keys. Position `0,0` is typically reserved for the auto-generated back button, so place folder contents starting from `0,1` onward.
+
+**Nesting:** Folders can contain other folder buttons, allowing multi-level nesting.
 
 ## Current Layout
 
