@@ -347,9 +347,11 @@ Key fields:
 
 ### Create Folder
 
-A folder button opens a nested sub-layout. When pressed, the Stream Deck displays the folder's buttons. A back button is automatically added.
+A folder button opens a nested sub-layout. When pressed, the Stream Deck displays the folder's buttons.
 
-Folders are implemented as a sub-profile embedded within the page manifest:
+⚠️ **IMPORTANT:** The correct UUID is `com.elgato.streamdeck.profile.openchild` — NOT `.folder`. A back button must be explicitly added at position `0,0` inside the folder using UUID `com.elgato.streamdeck.profile.backtoparent` with `Settings: null`.
+
+Folder opener button (on the main page):
 
 ```json
 {
@@ -358,11 +360,11 @@ Folders are implemented as a sub-profile embedded within the page manifest:
   "Name": "Create Folder",
   "Plugin": {
     "Name": "Create Folder",
-    "UUID": "com.elgato.streamdeck.profile.folder",
+    "UUID": "com.elgato.streamdeck.profile.openchild",
     "Version": "1.0"
   },
   "Settings": {
-    "ProfileUUID": "<folder-sub-profile-uuid>"
+    "ProfileUUID": "<folder-sub-profile-directory-name>"
   },
   "State": 0,
   "States": [
@@ -378,7 +380,30 @@ Folders are implemented as a sub-profile embedded within the page manifest:
       "TitleColor": "#ffffff"
     }
   ],
-  "UUID": "com.elgato.streamdeck.profile.folder"
+  "UUID": "com.elgato.streamdeck.profile.openchild"
+}
+```
+
+Back button (inside the folder at position `0,0`):
+
+```json
+{
+  "ActionID": "<generate-uuid-v4>",
+  "Name": "Open Folder",
+  "LinkedTitle": true,
+  "Plugin": {
+    "Name": "Open Folder",
+    "UUID": "com.elgato.streamdeck.profile.backtoparent",
+    "Version": "1.0"
+  },
+  "Settings": null,
+  "State": 0,
+  "States": [
+    {
+      "Title": ""
+    }
+  ],
+  "UUID": "com.elgato.streamdeck.profile.backtoparent"
 }
 ```
 
@@ -394,7 +419,7 @@ Profiles/
     Images/
 ```
 
-The folder's `manifest.json` uses the same `Controllers[0].Actions` structure with `"row,col"` keys. Position `0,0` is typically reserved for the auto-generated back button, so place folder contents starting from `0,1` onward.
+The folder's `manifest.json` uses the same `Controllers[0].Actions` structure with `"row,col"` keys. Position `0,0` must contain an explicit back button (UUID `com.elgato.streamdeck.profile.backtoparent`). Place folder contents starting from `0,1` onward.
 
 **Nesting:** Folders can contain other folder buttons, allowing multi-level nesting.
 
