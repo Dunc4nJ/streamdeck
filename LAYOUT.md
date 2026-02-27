@@ -177,11 +177,8 @@ I asked 3 competing LLMs to do the exact same thing and they came up with pretty
 Be sure to check your agent mail and to promptly respond if needed to any messages, and also acknowledge any contact requests; make sure you know the names of all active agents using the MCP Agent Mail system.
 ```
 
-### [6,1] Vercel
-
-```
-Also deploy to vercel and verify that the deployment worked properly without any errors (iterate and fix if there were errors).  Use ultrathink.
-```
+### [6,1] Dueling
+Wizards
 
 ### [6,2] (no title)
 
