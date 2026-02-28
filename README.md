@@ -7,20 +7,28 @@ A 32-button prompt palette for multi-agent vibecoding workflows on the Elgato St
 1. Install the [Elgato Stream Deck software](https://www.elgato.com/downloads)
 2. Double-click `vibecoding_profile.streamDeckProfile` to import
 
-## File Format
+## File Format (v3.0 — Stream Deck app 7.2+)
 
 The `.streamDeckProfile` file is a **ZIP archive** containing:
 
 ```
-<UUID>.sdProfile/
-  manifest.json              # Top-level profile metadata (device model, pages)
-  Images/                    # (empty at top level)
-  Profiles/
-    <PAGE_ID>/
-      manifest.json          # Button layout and actions for this page
-      Images/
-        <IMAGE_ID>.png       # Button icon images (144x144 PNG)
+package.json                                    # App version, device model, required plugins
+Profiles/
+  <PROFILE_UUID>.sdProfile/
+    manifest.json                               # Top-level profile metadata (device, pages)
+    Images/                                     # (empty at top level)
+    Profiles/
+      <PAGE_UUID>/                              # Main page (UPPERCASE dir name)
+        manifest.json                           # Button layout and actions
+        Images/
+          <IMAGE_ID>.png                        # Button icon images (144x144 PNG)
+      <FOLDER_UUID>/                            # Folder sub-profile (UPPERCASE dir name)
+        manifest.json                           # Folder button layout
+        Images/
+          <IMAGE_ID>.png
 ```
+
+> **UUID Case Convention:** Directory names on disk are **UPPERCASE** (e.g., `D81BA1C7-8793-42DF-8A14-1E65A3B4FEEC/`), but JSON references use **lowercase** (e.g., `"d81ba1c7-8793-42df-8a14-1e65a3b4feec"`). This is critical for programmatic creation.
 
 ## How to Edit Programmatically
 
@@ -33,14 +41,68 @@ cd /tmp/sd-edit
 unzip profile.zip
 ```
 
-### 2. Locate the Button Manifest
+### 2. Locate Key Files
 
-The main button config is at:
 ```
-AFBA0E43-48AA-48AC-958A-81E928D63A81.sdProfile/Profiles/BRMVM6VC1P1AP3DRJG6D7SSB2KZ/manifest.json
+package.json                                                          # Root metadata
+Profiles/<PROFILE_UUID>.sdProfile/manifest.json                       # Profile config
+Profiles/<PROFILE_UUID>.sdProfile/Profiles/<PAGE_UUID>/manifest.json  # Button actions
+```
+
+For this profile specifically:
+```
+Profiles/0B033AA6-23B9-4FEF-AEEB-712C1C7B7EB4.sdProfile/Profiles/AB4EE207-144A-4F32-A93B-73A3EA0F157F/manifest.json
 ```
 
 ### 3. Understand the JSON Structure
+
+#### package.json (ZIP root)
+
+Required metadata for Stream Deck app 7.2+:
+
+```json
+{
+  "AppVersion": "7.2.1.22472",
+  "DeviceModel": "20GAT9902",
+  "DeviceSettings": null,
+  "FormatVersion": 1,
+  "OSType": "macOS",
+  "OSVersion": "14.5.0",
+  "RequiredPlugins": [
+    "com.elgato.streamdeck.system.hotkey",
+    "com.elgato.streamdeck.profile.openchild",
+    "com.elgato.streamdeck.profile.backtoparent",
+    "com.elgato.streamdeck.system.text"
+  ]
+}
+```
+
+Key fields:
+- `DeviceModel` — `"20GAT9902"` for Stream Deck XL
+- `RequiredPlugins` — list all plugin UUIDs used by buttons in the profile (including folder/back plugins if folders exist)
+
+#### Top-level manifest.json
+
+```json
+{
+  "Device": { "Model": "20GAT9902", "UUID": "<device-uuid>" },
+  "Name": "Profile Name",
+  "Pages": {
+    "Current": "00000000-0000-0000-0000-000000000000",
+    "Default": "<default-page-uuid>",
+    "Pages": ["<main-page-uuid>"]
+  },
+  "Version": "3.0"
+}
+```
+
+Key fields:
+- `Pages.Pages` — array of page UUIDs (lowercase). **Folders are NOT listed here** — only actual pages.
+- `Pages.Default` — can point to an empty fallback page
+- `Pages.Current` — `"00000000-0000-0000-0000-000000000000"` is a special "current page" value
+- `Version` — must be `"3.0"`
+
+#### Page/Folder manifest.json (button layout)
 
 The manifest contains a `Controllers` array with one entry of type `Keypad`. Inside `Actions`, each button is keyed by grid position `"row,col"` (e.g., `"0,0"` is top-left, `"7,3"` is bottom-right).
 
@@ -58,6 +120,7 @@ Each button action looks like:
     "UUID": "com.elgato.streamdeck.system.text",
     "Version": "1.0"
   },
+  "Resources": null,
   "Settings": {
     "Hotkey": {
       "KeyModifiers": 0,
@@ -99,7 +162,7 @@ Edit `States[0].Title`.
 Place a 144x144 PNG in the `Images/` directory and update `States[0].Image` to `"Images/<filename>.png"`.
 
 **Add a new button:**
-Add a new entry under `Actions` with a unique `ActionID` (any UUID v4). Use `com.elgato.streamdeck.system.text` for text-paste buttons.
+Add a new entry under `Actions` with a unique `ActionID` (any UUID v4). Use `com.elgato.streamdeck.system.text` for text-paste buttons. Include `"Resources": null`.
 
 **Change button position:**
 Move the action object to a different `"row,col"` key.
@@ -112,21 +175,30 @@ Set `Settings.isSendingEnter` to `true`.
 ```bash
 cd /tmp/sd-edit
 rm profile.zip
-zip -r vibecoding_profile.streamDeckProfile AFBA0E43-48AA-48AC-958A-81E928D63A81.sdProfile/
+# ZIP from the directory containing package.json and Profiles/
+zip -r vibecoding_profile.streamDeckProfile package.json Profiles/
 cp vibecoding_profile.streamDeckProfile /path/to/repo/
 ```
 
-**Important:** The ZIP must contain the `.sdProfile` directory at root level (not nested in extra directories). Use `unzip -l` to verify structure before replacing the original.
+**Important:** The ZIP must contain `package.json` and `Profiles/` at root level. Use `unzip -l` to verify structure before replacing the original.
 
 ### 6. Validate
 
 ```bash
 # Verify ZIP structure is correct
 unzip -l vibecoding_profile.streamDeckProfile | head -5
-# Should show: AFBA0E43-48AA-48AC-958A-81E928D63A81.sdProfile/ at root
+# Should show: package.json and Profiles/ at root
 
-# Verify manifest is valid JSON
-unzip -p vibecoding_profile.streamDeckProfile "AFBA0E43-48AA-48AC-958A-81E928D63A81.sdProfile/Profiles/BRMVM6VC1P1AP3DRJG6D7SSB2KZ/manifest.json" | python3 -m json.tool > /dev/null && echo "Valid JSON"
+# Verify package.json is valid JSON
+unzip -p vibecoding_profile.streamDeckProfile "package.json" | python3 -m json.tool > /dev/null && echo "Valid package.json"
+
+# Verify main manifest is valid JSON
+unzip -p vibecoding_profile.streamDeckProfile \
+  "Profiles/0B033AA6-23B9-4FEF-AEEB-712C1C7B7EB4.sdProfile/Profiles/AB4EE207-144A-4F32-A93B-73A3EA0F157F/manifest.json" \
+  | python3 -m json.tool > /dev/null && echo "Valid manifest JSON"
+
+# Or run the included validator
+bash validate-profile.sh
 ```
 
 ## Button Action Types
@@ -138,7 +210,8 @@ unzip -p vibecoding_profile.streamDeckProfile "AFBA0E43-48AA-48AC-958A-81E928D63
 | `com.elgato.streamdeck.page.next` | Next Page | Navigate to the next page |
 | `com.elgato.streamdeck.page.previous` | Previous Page | Navigate to the previous page |
 | `com.elgato.streamdeck.page.pop` | Go to Page | Jump to a specific page |
-| `com.elgato.streamdeck.profile.folder` | Create Folder | Opens a nested group of buttons |
+| `com.elgato.streamdeck.profile.openchild` | Create Folder | Opens a nested group of buttons |
+| `com.elgato.streamdeck.profile.backtoparent` | Back to Parent | Returns from folder to parent view |
 
 Most buttons in this profile are **Text** actions that paste prompts into a terminal running Claude Code or similar AI coding tools.
 
@@ -156,6 +229,7 @@ Pastes text into the focused application when pressed. The workhorse of this pro
     "UUID": "com.elgato.streamdeck.system.text",
     "Version": "1.0"
   },
+  "Resources": null,
   "Settings": {
     "Hotkey": {
       "KeyModifiers": 0,
@@ -189,6 +263,7 @@ Key fields:
 - `Settings.pastedText` — the text that gets pasted
 - `Settings.isSendingEnter` — set `true` to press Enter after pasting (auto-submit)
 - `Settings.isTypingMode` — `true` types character-by-character (slower, more compatible); `false` pastes from clipboard (faster)
+- `Resources` — always `null` for v3.0
 - `States[0].Image` — path to the button icon PNG (omit for no icon)
 - `States[0].Title` — text label shown on the button
 - `States[0].ShowTitle` — `false` to hide the label and show only the icon
@@ -207,6 +282,7 @@ Sends a keyboard shortcut. The `Hotkeys` array supports up to 4 simultaneous key
     "UUID": "com.elgato.streamdeck.system.hotkey",
     "Version": "1.0"
   },
+  "Resources": null,
   "Settings": {
     "Coalesce": true,
     "Hotkeys": [
@@ -262,6 +338,7 @@ Navigation buttons for multi-page profiles. No settings required.
     "UUID": "com.elgato.streamdeck.page.next",
     "Version": "1.0"
   },
+  "Resources": null,
   "Settings": {},
   "State": 0,
   "States": [
@@ -272,7 +349,7 @@ Navigation buttons for multi-page profiles. No settings required.
       "FontUnderline": false,
       "OutlineThickness": 2,
       "ShowTitle": true,
-      "Title": "Next →",
+      "Title": "Next \u2192",
       "TitleAlignment": "middle",
       "TitleColor": "#ffffff"
     }
@@ -285,27 +362,27 @@ For Previous Page, replace:
 - `Plugin.Name` → `"Previous Page"`
 - `Plugin.UUID` → `"com.elgato.streamdeck.page.previous"`
 - `UUID` → `"com.elgato.streamdeck.page.previous"`
-- `Title` → `"← Prev"`
+- `Title` → `"\u2190 Prev"`
 
 To add a second page, update the **top-level** `manifest.json`:
 
 ```json
 {
-  "Device": { "Model": "20GAT9901", "UUID": "" },
+  "Device": { "Model": "20GAT9902", "UUID": "" },
   "Name": "Default Profile",
   "Pages": {
-    "Current": "<page-1-uuid>",
-    "Default": "<page-1-uuid>",
+    "Current": "00000000-0000-0000-0000-000000000000",
+    "Default": "<default-page-uuid>",
     "Pages": [
       "<page-1-uuid>",
       "<page-2-uuid>"
     ]
   },
-  "Version": "2.0"
+  "Version": "3.0"
 }
 ```
 
-Then create a new directory under `Profiles/` named `<PAGE_2_ID>/` with its own `manifest.json` and `Images/` folder, following the same structure as the existing page.
+Then create a new directory under `Profiles/` named `<PAGE_2_UUID>/` (UPPERCASE) with its own `manifest.json` and `Images/` folder, following the same structure as the existing page. Add the page's UUID (lowercase) to the `Pages.Pages` array. Also add `com.elgato.streamdeck.page.next` and/or `.previous` to `RequiredPlugins` in `package.json`.
 
 ### Go to Page
 
@@ -321,8 +398,9 @@ Jumps directly to a specific page number.
     "UUID": "com.elgato.streamdeck.page.pop",
     "Version": "1.0"
   },
+  "Resources": null,
   "Settings": {
-    "ProfileUUID": "<target-page-uuid-from-Pages-array>"
+    "ProfileUUID": "<target-page-uuid-lowercase>"
   },
   "State": 0,
   "States": [
@@ -343,13 +421,11 @@ Jumps directly to a specific page number.
 ```
 
 Key fields:
-- `Settings.ProfileUUID` — the UUID of the target page (must match an entry in the top-level manifest's `Pages.Pages` array)
+- `Settings.ProfileUUID` — the UUID of the target page (**lowercase**, must match an entry in the top-level manifest's `Pages.Pages` array)
 
 ### Create Folder
 
-A folder button opens a nested sub-layout. When pressed, the Stream Deck displays the folder's buttons.
-
-⚠️ **IMPORTANT:** The correct UUID is `com.elgato.streamdeck.profile.openchild` — NOT `.folder`. A back button must be explicitly added at position `0,0` inside the folder using UUID `com.elgato.streamdeck.profile.backtoparent` with `Settings: null`.
+A folder button opens a nested sub-layout. When pressed, the Stream Deck displays the folder's buttons. Folders are **not** listed in the `Pages.Pages` array — they are separate sub-profiles linked by `Settings.ProfileUUID`.
 
 Folder opener button (on the main page):
 
@@ -363,8 +439,9 @@ Folder opener button (on the main page):
     "UUID": "com.elgato.streamdeck.profile.openchild",
     "Version": "1.0"
   },
+  "Resources": null,
   "Settings": {
-    "ProfileUUID": "<folder-sub-profile-directory-name>"
+    "ProfileUUID": "<folder-sub-profile-uuid-lowercase>"
   },
   "State": 0,
   "States": [
@@ -389,41 +466,48 @@ Back button (inside the folder at position `0,0`):
 ```json
 {
   "ActionID": "<generate-uuid-v4>",
-  "Name": "Open Folder",
   "LinkedTitle": true,
+  "Name": "Parent Folder",
   "Plugin": {
-    "Name": "Open Folder",
+    "Name": "Open Parent Folder",
     "UUID": "com.elgato.streamdeck.profile.backtoparent",
     "Version": "1.0"
   },
-  "Settings": null,
+  "Resources": null,
+  "Settings": {},
   "State": 0,
-  "States": [
-    {
-      "Title": ""
-    }
-  ],
+  "States": [{}],
   "UUID": "com.elgato.streamdeck.profile.backtoparent"
 }
 ```
 
-The folder's contents are stored as a separate sub-profile directory under `Profiles/`, following the same manifest structure as a page. The `Settings.ProfileUUID` links to that sub-profile's directory name.
+The folder's contents are stored as a separate sub-profile directory under `Profiles/`, following the same manifest structure as a page. The `Settings.ProfileUUID` (lowercase) links to that sub-profile's directory name (UPPERCASE).
 
 ```
 Profiles/
-  <PAGE_ID>/           # Main page
+  <PAGE_UUID>/           # Main page
     manifest.json
     Images/
-  <FOLDER_ID>/         # Folder contents
-    manifest.json      # Same structure as a page manifest — has its own Actions grid
+  <FOLDER_UUID>/         # Folder contents (UPPERCASE dir name)
+    manifest.json        # Same structure as a page manifest — has its own Actions grid
     Images/
 ```
 
-The folder's `manifest.json` uses the same `Controllers[0].Actions` structure with `"row,col"` keys. Position `0,0` must contain an explicit back button (UUID `com.elgato.streamdeck.profile.backtoparent`). Place folder contents starting from `0,1` onward.
+The folder's `manifest.json` uses the same `Controllers[0].Actions` structure with `"row,col"` keys. Position `0,0` **must** contain an explicit back button (UUID `com.elgato.streamdeck.profile.backtoparent`). Place folder contents starting from `0,1` onward.
+
+**When creating folders programmatically:**
+1. Generate a UUID v4 for the folder
+2. Create directory `Profiles/<UPPERCASE-UUID>/` with `manifest.json` and `Images/`
+3. Add back button at `0,0` in the folder manifest
+4. Add folder opener button on the main page with `Settings.ProfileUUID` set to the **lowercase** UUID
+5. Add `com.elgato.streamdeck.profile.openchild` and `com.elgato.streamdeck.profile.backtoparent` to `RequiredPlugins` in `package.json`
+6. Do **NOT** add the folder UUID to `Pages.Pages` — folders are separate from pages
 
 **Nesting:** Folders can contain other folder buttons, allowing multi-level nesting.
 
 ## Current Layout
+
+### Main Page (8x4 Grid)
 
 | | Col 0 | Col 1 | Col 2 | Col 3 |
 |---|---|---|---|---|
@@ -433,5 +517,11 @@ The folder's `manifest.json` uses the same `Controllers[0].Actions` structure wi
 | **Row 3** | Expand README | Check Mail & Work | Revise README | Improve UX |
 | **Row 4** | Run UBS | Read AGENTS+README | Review Beads | Expand README |
 | **Row 5** | BV Insights | Register Agent Mail | PROCEED | Compare LLM Plans |
-| **Row 6** | Check Agent Mail | Vercel Deploy | Commit & Push | Build UX |
+| **Row 6** | Check Agent Mail | Dueling Wizards (folder) | Commit & Push | Build UX |
 | **Row 7** | Optimize Backend | DO IT w/ TODO | Test Coverage | Random Inspect |
+
+### Dueling Wizards Folder
+
+| | Col 0 | Col 1 | Col 2 | Col 3 |
+|---|---|---|---|---|
+| **Row 0** | Back (auto) | Idea Wizard | Score Rivals | Counter-Score |

@@ -177,8 +177,33 @@ I asked 3 competing LLMs to do the exact same thing and they came up with pretty
 Be sure to check your agent mail and to promptly respond if needed to any messages, and also acknowledge any contact requests; make sure you know the names of all active agents using the MCP Agent Mail system.
 ```
 
-### [6,1] Dueling
-Wizards
+### [6,1] Dueling Wizards (Folder)
+
+Opens a folder containing 3 "dueling wizards" prompts for cross-model idea evaluation:
+
+#### Folder Contents
+
+**[0,0] Back** — Returns to main page (automatic back button)
+
+**[0,1] Idea Wizard**
+
+```
+Come up with your very best ideas for improving this project to make it more robust, reliable, performant, intuitive, user-friendly, ergonomic, useful, compelling, etc. while still being obviously accretive and pragmatic. Come up with 30 ideas and then really think through each idea carefully, how it would work, how users are likely to perceive it, how we would implement it, etc; then winnow that list down to your VERY best 5 ideas. Explain each of the 5 ideas in order from best to worst and give your full, detailed rationale and justification for how and why it would make the project obviously better and why you're confident of that assessment.
+```
+
+**[0,2] Score Rivals**
+
+```
+I asked another model the same thing and it came up with the following list. I want you to very carefully consider and evaluate each of them and then give me your candid evaluation and score them from 0 (worst) to 1000 (best) as an overall score that reflects how good and smart the idea is, how useful in practical, real-life scenarios it would be for humans and ai coding agents like yourself, how practical it would be to implement it all correctly, whether the utility/advantages of the new feature/idea would easily justify the increased complexity and tech debt, etc. Here is the list:
+```
+
+**[0,3] Counter-Score**
+
+```
+I asked the other model the exact same thing, to score YOUR ideas using the same grading methodology. Here is what it came up with:
+```
+
+---
 
 ### [6,2] (no title)
 
