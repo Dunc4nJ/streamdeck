@@ -1,6 +1,6 @@
 # Vibecoding Stream Deck XL Profile
 
-A 32-button prompt palette for multi-agent vibecoding workflows on the Elgato Stream Deck XL.
+A 32-button prompt palette for multi-agent vibecoding workflows on the Elgato Stream Deck XL, with multi-page support and folder-based button grouping.
 
 ## Installation
 
@@ -18,15 +18,26 @@ Profiles/
     manifest.json                               # Top-level profile metadata (device, pages)
     Images/                                     # (empty at top level)
     Profiles/
-      <PAGE_UUID>/                              # Main page (UPPERCASE dir name)
+      <PAGE_1_UUID>/                            # Page 1 — main page (UPPERCASE dir name)
         manifest.json                           # Button layout and actions
         Images/
           <IMAGE_ID>.png                        # Button icon images (144x144 PNG)
+      <PAGE_2_UUID>/                            # Page 2 (optional additional pages)
+        manifest.json
+        Images/
       <FOLDER_UUID>/                            # Folder sub-profile (UPPERCASE dir name)
         manifest.json                           # Folder button layout
         Images/
           <IMAGE_ID>.png
+      <DEFAULT_UUID>/                           # Empty fallback page
+        manifest.json                           # {"Controllers":[{"Actions":null,"Type":"Keypad"}],...}
+        Images/
 ```
+
+All sub-profiles (pages, folders, default) live as sibling directories under `Profiles/`. There is **no structural difference** between a page directory and a folder directory on disk — the distinction is made in the top-level `manifest.json`:
+- **Pages** are listed in the `Pages.Pages` array (ordered)
+- **Folders** are referenced by `Settings.ProfileUUID` on folder-opener buttons
+- **Default page** is referenced by `Pages.Default`
 
 > **UUID Case Convention:** Directory names on disk are **UPPERCASE** (e.g., `D81BA1C7-8793-42DF-8A14-1E65A3B4FEEC/`), but JSON references use **lowercase** (e.g., `"d81ba1c7-8793-42df-8a14-1e65a3b4feec"`). This is critical for programmatic creation.
 
@@ -51,7 +62,10 @@ Profiles/<PROFILE_UUID>.sdProfile/Profiles/<PAGE_UUID>/manifest.json  # Button a
 
 For this profile specifically:
 ```
-Profiles/0B033AA6-23B9-4FEF-AEEB-712C1C7B7EB4.sdProfile/Profiles/AB4EE207-144A-4F32-A93B-73A3EA0F157F/manifest.json
+Profiles/268CEC16-E96D-45BB-B272-71BF8C5AB763.sdProfile/manifest.json                                          # Top-level
+Profiles/268CEC16-E96D-45BB-B272-71BF8C5AB763.sdProfile/Profiles/69504FFB-41E2-410D-A4E3-A35D76040128/manifest.json  # Page 1
+Profiles/268CEC16-E96D-45BB-B272-71BF8C5AB763.sdProfile/Profiles/AC1E1595-5240-46C5-8FEF-A7FE83A80058/manifest.json  # Page 2
+Profiles/268CEC16-E96D-45BB-B272-71BF8C5AB763.sdProfile/Profiles/2EEB9127-1957-4BA5-A04B-F65584EFC1FE/manifest.json  # Dueling Wizards folder
 ```
 
 ### 3. Understand the JSON Structure
@@ -70,37 +84,49 @@ Required metadata for Stream Deck app 7.2+:
   "OSVersion": "14.5.0",
   "RequiredPlugins": [
     "com.elgato.streamdeck.system.hotkey",
-    "com.elgato.streamdeck.profile.openchild",
     "com.elgato.streamdeck.profile.backtoparent",
-    "com.elgato.streamdeck.system.text"
+    "com.elgato.streamdeck.system.text",
+    "com.elgato.streamdeck.profile.openchild",
+    "com.elgato.streamdeck.page"
   ]
 }
 ```
 
 Key fields:
 - `DeviceModel` — `"20GAT9902"` for Stream Deck XL
-- `RequiredPlugins` — list all plugin UUIDs used by buttons in the profile (including folder/back plugins if folders exist)
+- `RequiredPlugins` — list **all** plugin UUIDs used by buttons in the profile. This includes:
+  - `com.elgato.streamdeck.system.text` — text/paste buttons
+  - `com.elgato.streamdeck.system.hotkey` — keyboard shortcut buttons
+  - `com.elgato.streamdeck.page` — page navigation buttons (Next/Previous/Go to Page)
+  - `com.elgato.streamdeck.profile.openchild` — folder opener buttons
+  - `com.elgato.streamdeck.profile.backtoparent` — folder back buttons
+
+> **Important:** For page navigation, add `com.elgato.streamdeck.page` to RequiredPlugins — NOT the variant-specific UUIDs like `.page.next` or `.page.previous`. The page plugin is a single plugin with multiple action variants.
 
 #### Top-level manifest.json
 
 ```json
 {
   "Device": { "Model": "20GAT9902", "UUID": "<device-uuid>" },
-  "Name": "Profile Name",
+  "Name": "Default Profile copy",
   "Pages": {
     "Current": "00000000-0000-0000-0000-000000000000",
     "Default": "<default-page-uuid>",
-    "Pages": ["<main-page-uuid>"]
+    "Pages": [
+      "<page-1-uuid>",
+      "<page-2-uuid>"
+    ]
   },
   "Version": "3.0"
 }
 ```
 
 Key fields:
-- `Pages.Pages` — array of page UUIDs (lowercase). **Folders are NOT listed here** — only actual pages.
-- `Pages.Default` — can point to an empty fallback page
+- `Pages.Pages` — ordered array of page UUIDs (lowercase). **Only actual pages go here.** Folders are NOT listed — they are linked via `Settings.ProfileUUID` on folder buttons.
+- `Pages.Default` — points to an empty fallback page (its manifest has `"Actions": null`)
 - `Pages.Current` — `"00000000-0000-0000-0000-000000000000"` is a special "current page" value
 - `Version` — must be `"3.0"`
+- The order of UUIDs in `Pages.Pages` determines page navigation order (Next Page goes from index 0 to 1 to 2, etc.)
 
 #### Page/Folder manifest.json (button layout)
 
@@ -192,28 +218,34 @@ unzip -l vibecoding_profile.streamDeckProfile | head -5
 # Verify package.json is valid JSON
 unzip -p vibecoding_profile.streamDeckProfile "package.json" | python3 -m json.tool > /dev/null && echo "Valid package.json"
 
-# Verify main manifest is valid JSON
-unzip -p vibecoding_profile.streamDeckProfile \
-  "Profiles/0B033AA6-23B9-4FEF-AEEB-712C1C7B7EB4.sdProfile/Profiles/AB4EE207-144A-4F32-A93B-73A3EA0F157F/manifest.json" \
-  | python3 -m json.tool > /dev/null && echo "Valid manifest JSON"
-
 # Or run the included validator
 bash validate-profile.sh
 ```
 
 ## Button Action Types
 
-| Plugin UUID | Name | Purpose |
-|---|---|---|
-| `com.elgato.streamdeck.system.text` | Text | Pastes text into the focused application |
-| `com.elgato.streamdeck.system.hotkey` | Hotkey | Sends a keyboard shortcut |
-| `com.elgato.streamdeck.page.next` | Next Page | Navigate to the next page |
-| `com.elgato.streamdeck.page.previous` | Previous Page | Navigate to the previous page |
-| `com.elgato.streamdeck.page.pop` | Go to Page | Jump to a specific page |
-| `com.elgato.streamdeck.profile.openchild` | Create Folder | Opens a nested group of buttons |
-| `com.elgato.streamdeck.profile.backtoparent` | Back to Parent | Returns from folder to parent view |
+Every button has two UUID fields that serve different purposes:
 
-Most buttons in this profile are **Text** actions that paste prompts into a terminal running Claude Code or similar AI coding tools.
+| Field | Purpose |
+|---|---|
+| `Plugin.UUID` | Identifies the **plugin** that powers the button |
+| `UUID` (top-level) | Identifies the specific **action variant** within that plugin |
+
+For most button types, these are identical. The exception is **page navigation** — a single plugin (`com.elgato.streamdeck.page`) provides three action variants (`.next`, `.previous`, `.pop`).
+
+### Reference Table
+
+| Plugin UUID | Action UUID | Name | Purpose |
+|---|---|---|---|
+| `com.elgato.streamdeck.system.text` | (same) | Text | Pastes text into the focused application |
+| `com.elgato.streamdeck.system.hotkey` | (same) | Hotkey | Sends a keyboard shortcut |
+| `com.elgato.streamdeck.page` | `.page.next` | Next Page | Navigate to the next page in sequence |
+| `com.elgato.streamdeck.page` | `.page.previous` | Previous Page | Navigate to the previous page in sequence |
+| `com.elgato.streamdeck.page` | `.page.pop` | Go to Page | Jump directly to a specific page |
+| `com.elgato.streamdeck.profile.openchild` | (same) | Create Folder | Opens a nested group of buttons |
+| `com.elgato.streamdeck.profile.backtoparent` | (same) | Back to Parent | Returns from folder to parent view |
+
+> **RequiredPlugins:** Add `Plugin.UUID` values (not action UUIDs) to `RequiredPlugins` in `package.json`. For page navigation, this means adding `com.elgato.streamdeck.page` once — not each variant separately.
 
 ### Text Button
 
@@ -324,69 +356,76 @@ Key fields:
 - `VKeyCode` — virtual key code (`-1` means unused/empty slot)
 - `Settings.Coalesce` — `true` to send all hotkeys as one action
 
-### Next Page / Previous Page
+## Configuring Pages & Folders
 
-Navigation buttons for multi-page profiles. No settings required.
+Pages and folders both create additional button grids, but they work very differently. Understanding the distinction is critical for programmatic profile creation.
+
+### Pages vs Folders
+
+| | Pages | Folders |
+|---|---|---|
+| **Metaphor** | Browser tabs (horizontal) | Drill-down menu (vertical) |
+| **Navigation** | Next/Previous/Go to Page buttons | Folder opener + Back button |
+| **Listed in manifest** | Yes — `Pages.Pages` array (ordered) | No — linked via `Settings.ProfileUUID` |
+| **Can contain** | Any buttons, including folder openers | Any buttons (must have Back button at 0,0) |
+| **Nesting** | Flat — all pages at same level | Can nest folders inside folders |
+| **Plugin UUID** | `com.elgato.streamdeck.page` | `com.elgato.streamdeck.profile.openchild` |
+| **RequiredPlugins entry** | `com.elgato.streamdeck.page` | `com.elgato.streamdeck.profile.openchild` + `...backtoparent` |
+| **When to use** | Need more than 32 buttons | Group related buttons with a labeled entry point |
+
+### Page Navigation Buttons
+
+All page navigation buttons share the same plugin (`com.elgato.streamdeck.page`) but use different action UUIDs. They all have `"Settings": {}` and `"States": [{}]` — the Stream Deck app renders their icons automatically.
+
+#### Next Page
+
+Navigates to the next page in the `Pages.Pages` array. Wraps around from the last page to the first.
 
 ```json
 {
-  "ActionID": "<generate-uuid-v4>",
+  "ActionID": "c14ed479-5c83-4d08-b6b6-7302d8070313",
   "LinkedTitle": true,
   "Name": "Next Page",
   "Plugin": {
-    "Name": "Next Page",
-    "UUID": "com.elgato.streamdeck.page.next",
+    "Name": "Pages",
+    "UUID": "com.elgato.streamdeck.page",
     "Version": "1.0"
   },
   "Resources": null,
   "Settings": {},
   "State": 0,
-  "States": [
-    {
-      "FontFamily": "",
-      "FontSize": 12,
-      "FontStyle": "",
-      "FontUnderline": false,
-      "OutlineThickness": 2,
-      "ShowTitle": true,
-      "Title": "Next \u2192",
-      "TitleAlignment": "middle",
-      "TitleColor": "#ffffff"
-    }
-  ],
+  "States": [{}],
   "UUID": "com.elgato.streamdeck.page.next"
 }
 ```
 
-For Previous Page, replace:
-- `Plugin.Name` → `"Previous Page"`
-- `Plugin.UUID` → `"com.elgato.streamdeck.page.previous"`
-- `UUID` → `"com.elgato.streamdeck.page.previous"`
-- `Title` → `"\u2190 Prev"`
+> **Verified from export.** Note: `Plugin.Name` is `"Pages"` and `Plugin.UUID` is the plugin-level `com.elgato.streamdeck.page`. The action-specific UUID `com.elgato.streamdeck.page.next` goes in the top-level `UUID` field only.
 
-To add a second page, update the **top-level** `manifest.json`:
+#### Previous Page
+
+Navigates to the previous page. Wraps around from the first page to the last.
 
 ```json
 {
-  "Device": { "Model": "20GAT9902", "UUID": "" },
-  "Name": "Default Profile",
-  "Pages": {
-    "Current": "00000000-0000-0000-0000-000000000000",
-    "Default": "<default-page-uuid>",
-    "Pages": [
-      "<page-1-uuid>",
-      "<page-2-uuid>"
-    ]
+  "ActionID": "3215bf59-0cfe-48b8-b2cc-d2d546555047",
+  "LinkedTitle": true,
+  "Name": "Previous Page",
+  "Plugin": {
+    "Name": "Pages",
+    "UUID": "com.elgato.streamdeck.page",
+    "Version": "1.0"
   },
-  "Version": "3.0"
+  "Resources": null,
+  "Settings": {},
+  "State": 0,
+  "States": [{}],
+  "UUID": "com.elgato.streamdeck.page.previous"
 }
 ```
 
-Then create a new directory under `Profiles/` named `<PAGE_2_UUID>/` (UPPERCASE) with its own `manifest.json` and `Images/` folder, following the same structure as the existing page. Add the page's UUID (lowercase) to the `Pages.Pages` array. Also add `com.elgato.streamdeck.page.next` and/or `.previous` to `RequiredPlugins` in `package.json`.
+#### Go to Page
 
-### Go to Page
-
-Jumps directly to a specific page number.
+Jumps directly to a specific page by UUID. **Not yet verified from a real export** — extrapolated from the Next/Previous pattern. Use with caution.
 
 ```json
 {
@@ -394,8 +433,8 @@ Jumps directly to a specific page number.
   "LinkedTitle": true,
   "Name": "Go To Page",
   "Plugin": {
-    "Name": "Go To Page",
-    "UUID": "com.elgato.streamdeck.page.pop",
+    "Name": "Pages",
+    "UUID": "com.elgato.streamdeck.page",
     "Version": "1.0"
   },
   "Resources": null,
@@ -403,19 +442,7 @@ Jumps directly to a specific page number.
     "ProfileUUID": "<target-page-uuid-lowercase>"
   },
   "State": 0,
-  "States": [
-    {
-      "FontFamily": "",
-      "FontSize": 12,
-      "FontStyle": "",
-      "FontUnderline": false,
-      "OutlineThickness": 2,
-      "ShowTitle": true,
-      "Title": "Page 2",
-      "TitleAlignment": "middle",
-      "TitleColor": "#ffffff"
-    }
-  ],
+  "States": [{}],
   "UUID": "com.elgato.streamdeck.page.pop"
 }
 ```
@@ -423,15 +450,237 @@ Jumps directly to a specific page number.
 Key fields:
 - `Settings.ProfileUUID` — the UUID of the target page (**lowercase**, must match an entry in the top-level manifest's `Pages.Pages` array)
 
-### Create Folder
+### How to Add a Second Page (Step-by-Step)
 
-A folder button opens a nested sub-layout. When pressed, the Stream Deck displays the folder's buttons. Folders are **not** listed in the `Pages.Pages` array — they are separate sub-profiles linked by `Settings.ProfileUUID`.
+This walkthrough adds a Page 2 to an existing single-page profile.
 
-Folder opener button (on the main page):
+#### Step 1: Generate a UUID for the new page
+
+```bash
+uuidgen  # e.g., AC1E1595-5240-46C5-8FEF-A7FE83A80058
+```
+
+#### Step 2: Create the page directory
+
+Inside the `.sdProfile/Profiles/` directory, create a new directory with the **UPPERCASE** UUID:
+
+```bash
+mkdir -p Profiles/<PROFILE>.sdProfile/Profiles/AC1E1595-5240-46C5-8FEF-A7FE83A80058/Images
+```
+
+#### Step 3: Create the page manifest
+
+Write a `manifest.json` for Page 2. This follows the exact same structure as any page manifest:
 
 ```json
 {
-  "ActionID": "<generate-uuid-v4>",
+  "Controllers": [
+    {
+      "Actions": {
+        "0,0": {
+          "ActionID": "21f219ee-7227-41f2-b3cc-3b5e5934035d",
+          "LinkedTitle": true,
+          "Name": "Text",
+          "Plugin": {
+            "Name": "Text",
+            "UUID": "com.elgato.streamdeck.system.text",
+            "Version": "1.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "Hotkey": { "KeyModifiers": 0, "QTKeyCode": 33554431, "VKeyCode": -1 },
+            "isSendingEnter": false,
+            "isTypingMode": false,
+            "pastedText": "Your prompt text here"
+          },
+          "State": 0,
+          "States": [{ "Title": "My Button" }],
+          "UUID": "com.elgato.streamdeck.system.text"
+        },
+        "0,3": {
+          "ActionID": "3215bf59-0cfe-48b8-b2cc-d2d546555047",
+          "LinkedTitle": true,
+          "Name": "Previous Page",
+          "Plugin": {
+            "Name": "Pages",
+            "UUID": "com.elgato.streamdeck.page",
+            "Version": "1.0"
+          },
+          "Resources": null,
+          "Settings": {},
+          "State": 0,
+          "States": [{}],
+          "UUID": "com.elgato.streamdeck.page.previous"
+        }
+      },
+      "Type": "Keypad"
+    }
+  ],
+  "Icon": "",
+  "Name": ""
+}
+```
+
+> **Tip:** Always include a Previous Page button on Page 2+ so users can navigate back. Position `0,3` (top-right) is a natural choice.
+
+#### Step 4: Add a Next Page button on Page 1
+
+Add this button to Page 1's manifest at any available position (e.g., `7,3` bottom-right):
+
+```json
+"7,3": {
+  "ActionID": "c14ed479-5c83-4d08-b6b6-7302d8070313",
+  "LinkedTitle": true,
+  "Name": "Next Page",
+  "Plugin": {
+    "Name": "Pages",
+    "UUID": "com.elgato.streamdeck.page",
+    "Version": "1.0"
+  },
+  "Resources": null,
+  "Settings": {},
+  "State": 0,
+  "States": [{}],
+  "UUID": "com.elgato.streamdeck.page.next"
+}
+```
+
+#### Step 5: Register the page in the top-level manifest
+
+Add the new page UUID (**lowercase**) to the `Pages.Pages` array:
+
+```json
+{
+  "Device": { "Model": "20GAT9902", "UUID": "<device-uuid>" },
+  "Name": "Default Profile copy",
+  "Pages": {
+    "Current": "00000000-0000-0000-0000-000000000000",
+    "Default": "<default-page-uuid>",
+    "Pages": [
+      "69504ffb-41e2-410d-a4e3-a35d76040128",
+      "ac1e1595-5240-46c5-8fef-a7fe83a80058"
+    ]
+  },
+  "Version": "3.0"
+}
+```
+
+The order of UUIDs in `Pages.Pages` determines navigation order — Next Page goes from index 0 to 1 to 2, etc.
+
+#### Step 6: Update RequiredPlugins
+
+Add `"com.elgato.streamdeck.page"` to the `RequiredPlugins` array in `package.json`:
+
+```json
+"RequiredPlugins": [
+  "com.elgato.streamdeck.system.text",
+  "com.elgato.streamdeck.page"
+]
+```
+
+#### Step 7: Repackage and validate
+
+```bash
+rm -f vibecoding_profile.streamDeckProfile
+zip -r vibecoding_profile.streamDeckProfile package.json Profiles/
+bash validate-profile.sh vibecoding_profile.streamDeckProfile
+```
+
+### How to Add a Folder (Step-by-Step)
+
+Folders create a nested button group that opens when pressed and has a Back button to return.
+
+#### Step 1: Generate a UUID for the folder
+
+```bash
+uuidgen  # e.g., 2EEB9127-1957-4BA5-A04B-F65584EFC1FE
+```
+
+#### Step 2: Create the folder directory
+
+```bash
+mkdir -p Profiles/<PROFILE>.sdProfile/Profiles/2EEB9127-1957-4BA5-A04B-F65584EFC1FE/Images
+```
+
+#### Step 3: Create the folder manifest
+
+The folder manifest follows the same structure as a page manifest. Position `0,0` **must** contain a Back to Parent button. Place folder content buttons starting from `0,1` onward.
+
+```json
+{
+  "Controllers": [
+    {
+      "Actions": {
+        "0,0": {
+          "ActionID": "18be553e-55e6-4fee-9294-205d13308874",
+          "LinkedTitle": true,
+          "Name": "Parent Folder",
+          "Plugin": {
+            "Name": "Open Parent Folder",
+            "UUID": "com.elgato.streamdeck.profile.backtoparent",
+            "Version": "1.0"
+          },
+          "Resources": null,
+          "Settings": {},
+          "State": 0,
+          "States": [{}],
+          "UUID": "com.elgato.streamdeck.profile.backtoparent"
+        },
+        "0,1": {
+          "ActionID": "96bfc65d-a985-4e47-b661-f79221d3413a",
+          "LinkedTitle": true,
+          "Name": "Text",
+          "Plugin": {
+            "Name": "Text",
+            "UUID": "com.elgato.streamdeck.system.text",
+            "Version": "1.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "Hotkey": { "KeyModifiers": 0, "QTKeyCode": 33554431, "VKeyCode": -1 },
+            "isSendingEnter": false,
+            "isTypingMode": false,
+            "pastedText": "Your folder button prompt here"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "Verdana",
+              "FontSize": 7,
+              "FontStyle": "Regular",
+              "FontUnderline": false,
+              "Image": "Images/MY_BUTTON_ICON.png",
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "Title": "Button Title",
+              "TitleAlignment": "top",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.elgato.streamdeck.system.text"
+        }
+      },
+      "Type": "Keypad"
+    }
+  ],
+  "Icon": "",
+  "Name": "My Folder Name"
+}
+```
+
+Key details for the Back button:
+- `Name` must be `"Parent Folder"` (not "Back" or "Open Folder")
+- `Plugin.Name` must be `"Open Parent Folder"`
+- `Settings` must be `{}` (empty object, not `null`)
+- `States` must be `[{}]` (the Stream Deck renders the back icon automatically)
+
+#### Step 4: Add a folder opener button on the parent page
+
+On the page where you want the folder entry point, add:
+
+```json
+"6,1": {
+  "ActionID": "d4ed992b-3fa0-4954-86c9-26ffe7528810",
   "LinkedTitle": true,
   "Name": "Create Folder",
   "Plugin": {
@@ -441,15 +690,16 @@ Folder opener button (on the main page):
   },
   "Resources": null,
   "Settings": {
-    "ProfileUUID": "<folder-sub-profile-uuid-lowercase>"
+    "ProfileUUID": "2eeb9127-1957-4ba5-a04b-f65584efc1fe"
   },
   "State": 0,
   "States": [
     {
       "FontFamily": "Verdana",
-      "FontSize": 10,
+      "FontSize": 7,
       "FontStyle": "Regular",
       "FontUnderline": false,
+      "Image": "Images/FOLDER_ICON.png",
       "OutlineThickness": 2,
       "ShowTitle": true,
       "Title": "My Folder",
@@ -461,64 +711,57 @@ Folder opener button (on the main page):
 }
 ```
 
-Back button (inside the folder at position `0,0`):
+The critical link: `Settings.ProfileUUID` must be the **lowercase** version of the folder directory name.
+
+#### Step 5: Update RequiredPlugins
+
+Add both folder-related plugins to `package.json`:
 
 ```json
-{
-  "ActionID": "<generate-uuid-v4>",
-  "LinkedTitle": true,
-  "Name": "Parent Folder",
-  "Plugin": {
-    "Name": "Open Parent Folder",
-    "UUID": "com.elgato.streamdeck.profile.backtoparent",
-    "Version": "1.0"
-  },
-  "Resources": null,
-  "Settings": {},
-  "State": 0,
-  "States": [{}],
-  "UUID": "com.elgato.streamdeck.profile.backtoparent"
-}
+"RequiredPlugins": [
+  "com.elgato.streamdeck.system.text",
+  "com.elgato.streamdeck.profile.openchild",
+  "com.elgato.streamdeck.profile.backtoparent"
+]
 ```
 
-The folder's contents are stored as a separate sub-profile directory under `Profiles/`, following the same manifest structure as a page. The `Settings.ProfileUUID` (lowercase) links to that sub-profile's directory name (UPPERCASE).
+#### Step 6: Do NOT add to Pages.Pages
 
-```
-Profiles/
-  <PAGE_UUID>/           # Main page
-    manifest.json
-    Images/
-  <FOLDER_UUID>/         # Folder contents (UPPERCASE dir name)
-    manifest.json        # Same structure as a page manifest — has its own Actions grid
-    Images/
-```
+This is the most common mistake. Folder UUIDs must **never** appear in the `Pages.Pages` array. Only actual pages go there. The folder is linked solely through `Settings.ProfileUUID` on the opener button.
 
-The folder's `manifest.json` uses the same `Controllers[0].Actions` structure with `"row,col"` keys. Position `0,0` **must** contain an explicit back button (UUID `com.elgato.streamdeck.profile.backtoparent`). Place folder contents starting from `0,1` onward.
+### Common Mistakes
 
-**When creating folders programmatically:**
-1. Generate a UUID v4 for the folder
-2. Create directory `Profiles/<UPPERCASE-UUID>/` with `manifest.json` and `Images/`
-3. Add back button at `0,0` in the folder manifest
-4. Add folder opener button on the main page with `Settings.ProfileUUID` set to the **lowercase** UUID
-5. Add `com.elgato.streamdeck.profile.openchild` and `com.elgato.streamdeck.profile.backtoparent` to `RequiredPlugins` in `package.json`
-6. Do **NOT** add the folder UUID to `Pages.Pages` — folders are separate from pages
-
-**Nesting:** Folders can contain other folder buttons, allowing multi-level nesting.
+| Mistake | Symptom | Fix |
+|---|---|---|
+| Using `com.elgato.streamdeck.page.next` as `Plugin.UUID` | Button doesn't work | Use `com.elgato.streamdeck.page` for Plugin.UUID |
+| Adding folder UUID to `Pages.Pages` | Folder appears as a page | Remove from `Pages.Pages`; link via `Settings.ProfileUUID` only |
+| UPPERCASE UUID in JSON references | Profile doesn't load | Use lowercase in all JSON fields; UPPERCASE for directory names only |
+| Missing `"Resources": null` on buttons | May not import correctly | Always include `"Resources": null` on every button |
+| `Settings: null` on Back button | Back button broken | Use `"Settings": {}` (empty object) |
+| Wrong `Plugin.Name` on Back button | May not render correctly | Must be `"Open Parent Folder"`, not "Back" or "Open Folder" |
+| Adding variant UUIDs to RequiredPlugins | May not import correctly | Use plugin-level UUIDs (e.g., `com.elgato.streamdeck.page`, not `.page.next`) |
+| `Pages.Pages` in wrong order | Pages navigate in wrong sequence | Order determines Next/Previous navigation sequence |
 
 ## Current Layout
 
-### Main Page (8x4 Grid)
+### Page 1 — Main Page (8x4 Grid)
 
 | | Col 0 | Col 1 | Col 2 | Col 3 |
 |---|---|---|---|---|
 | **Row 0** | New Term (hotkey) | Code Review | Default New Agent | Read & Continue |
 | **Row 1** | Execute Beads | Reread AGENTS | Next Bead | Use BV |
 | **Row 2** | Create Beads | Ultrathink | Scrutinize UX | Fresh Eyes Review |
-| **Row 3** | Expand README | Check Mail & Work | Revise README | Improve UX |
+| **Row 3** | Expand README | Check Mail & Work | Revise README | Random Inspect |
 | **Row 4** | Run UBS | Read AGENTS+README | Review Beads | Expand README |
 | **Row 5** | BV Insights | Register Agent Mail | PROCEED | Compare LLM Plans |
 | **Row 6** | Check Agent Mail | Dueling Wizards (folder) | Commit & Push | Build UX |
-| **Row 7** | Optimize Backend | DO IT w/ TODO | Test Coverage | Random Inspect |
+| **Row 7** | Optimize Backend | DO IT w/ TODO | Test Coverage | Next Page |
+
+### Page 2
+
+| | Col 0 | Col 1 | Col 2 | Col 3 |
+|---|---|---|---|---|
+| **Row 0** | Test Button | | | Previous Page |
 
 ### Dueling Wizards Folder
 

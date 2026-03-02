@@ -1,6 +1,8 @@
 # Stream Deck XL — Button Layout & Prompts
 
-8 rows × 4 columns. Position format: `row,col` (0,0 = top-left)
+8 rows × 4 columns per page. Position format: `row,col` (0,0 = top-left)
+
+## Page 1 (Main Page)
 
 ---
 
@@ -105,10 +107,10 @@ Be sure to check your agent mail and to promptly respond if needed to any messag
 We need to revise the README too for these changes (don't write about these as "changes" however, make it read like it was always like that, we don't have any users yet!)
 ```
 
-### [3,3] Improve UX
+### [3,3] Random Inspect
 
 ```
-Do a thorough UI/UX improvement pass aiming for true world-class, Stripe-level polish. Consider desktop and mobile separately and hyper-optimize for each modality. Focus on making everything more intuitive, visually stunning, user-friendly, and slick — leveraging the good libraries already in the project.
+I want you to sort of randomly explore the code files in this project, choosing code files to deeply investigate and understand and trace their functionality and execution flows through the related code files which they import or which they are imported by. Once you understand the purpose of the code in the larger context of the workflows, I want you to do a super careful, methodical, and critical check with "fresh eyes" to find any obvious bugs, problems, errors, issues, silly mistakes, etc. and then systematically and meticulously and intelligently correct them. Be sure to comply with ALL rules in AGENTS.md and ensure that any code you write or revise conforms to the best practice guides referenced in the AGENTS.md file.
 ```
 
 ---
@@ -240,9 +242,20 @@ OK, please do ALL of that now. Keep a super detailed, granular, and complete TOD
 Do we have full unit test coverage without using mocks/fake stuff? What about complete e2e integration test scripts with great, detailed logging? If not, then create a comprehensive and granular set of beads for all this with tasks, subtasks, and dependency structure overlaid with detailed comments.
 ```
 
-### [7,3] Random
-Inspect
+### [7,3] Next Page
+
+Page navigation button — navigates to Page 2. No prompt (handled automatically by Stream Deck).
+
+---
+
+## Page 2
+
+### [0,0] Test Button Page 2
 
 ```
-I want you to sort of randomly explore the code files in this project, choosing code files to deeply investigate and understand and trace their functionality and execution flows through the related code files which they import or which they are imported by. Once you understand the purpose of the code in the larger context of the workflows, I want you to do a super careful, methodical, and critical check with "fresh eyes" to find any obvious bugs, problems, errors, issues, silly mistakes, etc. and then systematically and meticulously and intelligently correct them. Be sure to comply with ALL rules in AGENTS.md and ensure that any code you write or revise conforms to the best practice guides referenced in the AGENTS.md file.
+Test button prompt
 ```
+
+### [0,3] Previous Page
+
+Page navigation button — navigates back to Page 1. No prompt (handled automatically by Stream Deck).

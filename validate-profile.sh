@@ -174,6 +174,25 @@ for pos, btn in actions.items():
         if profile_uuid:
             folder_refs.append((pos, profile_uuid))
 
+    # Track page navigation buttons
+    page_uuids = [
+        "com.elgato.streamdeck.page.next",
+        "com.elgato.streamdeck.page.previous",
+        "com.elgato.streamdeck.page.pop",
+    ]
+    if btn.get("UUID") in page_uuids:
+        plugin_uuid = btn.get("Plugin", {}).get("UUID", "")
+        if plugin_uuid != "com.elgato.streamdeck.page":
+            print(f"  ERROR: Page button at {pos} has Plugin.UUID '{plugin_uuid}' (should be 'com.elgato.streamdeck.page')")
+            errors += 1
+        if btn.get("UUID") == "com.elgato.streamdeck.page.pop":
+            target = btn.get("Settings", {}).get("ProfileUUID", "")
+            if target:
+                print(f"  INFO: Go to Page at {pos} -> {target}")
+            else:
+                print(f"  ERROR: Go to Page at {pos} missing Settings.ProfileUUID")
+                errors += 1
+
 for pos, uuid in folder_refs:
     print(f"  INFO: Folder at {pos} -> {uuid}")
 
@@ -192,6 +211,51 @@ PYEOF
 done
 
 ok "Total profile directories: $PROFILE_COUNT"
+
+# 7. Cross-reference Pages.Pages with actual directories
+RESULT=$(python3 << PYEOF || true
+import json, sys, os
+
+manifest_path = "$TOP_MANIFEST"
+sd_dir = "$SD_DIR"
+
+with open(manifest_path) as f:
+    data = json.load(f)
+
+pages = data.get("Pages", {}).get("Pages", [])
+default_page = data.get("Pages", {}).get("Default", "")
+errors = 0
+
+print(f"  Pages in manifest: {len(pages)}")
+for i, page_uuid in enumerate(pages):
+    dir_name = page_uuid.upper()
+    page_dir = os.path.join(sd_dir, "Profiles", dir_name)
+    if os.path.isdir(page_dir):
+        print(f"  OK: Page {i+1} ({page_uuid}) -> {dir_name}/ exists")
+    else:
+        print(f"  ERROR: Page {i+1} ({page_uuid}) -> {dir_name}/ NOT FOUND")
+        errors += 1
+
+if default_page:
+    dir_name = default_page.upper()
+    page_dir = os.path.join(sd_dir, "Profiles", dir_name)
+    if os.path.isdir(page_dir):
+        print(f"  OK: Default page ({default_page}) -> {dir_name}/ exists")
+    else:
+        print(f"  ERROR: Default page ({default_page}) -> {dir_name}/ NOT FOUND")
+        errors += 1
+
+sys.exit(errors)
+PYEOF
+)
+XREF_ERRORS=$?
+echo "$RESULT" | grep -v "^$"
+if [[ $XREF_ERRORS -gt 0 ]]; then
+  ((ERRORS += XREF_ERRORS)) || true
+  err "Page cross-reference: $XREF_ERRORS error(s)"
+else
+  ok "All pages in manifest have matching directories"
+fi
 
 echo ""
 echo "=== Results ==="
